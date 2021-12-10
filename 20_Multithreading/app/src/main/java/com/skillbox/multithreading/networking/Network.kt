@@ -12,7 +12,9 @@ import retrofit2.create
 
 object Network {
 
-    const val MOVIE_API_KEY = "43541a05"
+    //Get your API key here
+    //http://www.omdbapi.com/apikey.aspx
+    const val MOVIE_API_KEY = "________"
 
     private val client = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
