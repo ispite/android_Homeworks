@@ -205,7 +205,7 @@ class VehicleListFragment : Fragment(R.layout.fragment_vehicle_list),
     }
 
     fun loadNextDataFromApi(offset: Int) {
-        if (vehicleAdapter.items.count() < 10) {
+        if (vehicleAdapter.items.count() < 1000) {
             vehicleAdapter.items = vehicleAdapter.items + generateVehicles(offset)
         }
         // Send an API request to retrieve appropriate paginated data
