@@ -1,6 +1,5 @@
 package ru.skillbox.a21_networking.network
 
-import android.util.Log
 import com.facebook.flipper.plugins.network.NetworkFlipperPlugin
 import okhttp3.Call
 import okhttp3.HttpUrl
@@ -13,7 +12,6 @@ object Network {
     val flipperNetworkPlugin = NetworkFlipperPlugin()
 
     private val client = OkHttpClient.Builder()
-        .addNetworkInterceptor(StoreLastUnsuccessfulRequest())
         .addNetworkInterceptor(APIKeyAdderInterceptor(API_KEY))
         .build()
 
@@ -27,7 +25,7 @@ object Network {
             .addQueryParameter("s", text)
             .build()
 
-        Log.d("Network getSearch", "Network: $url")
+        //Log.d("Network getSearch", "Network: $url")
 
         val request = Request.Builder()
             .get()
@@ -37,7 +35,11 @@ object Network {
         return client.newCall(request)
     }
 
-    fun getSearchWithParametersMovieCall(title: String, yearOfProduction: String, typeOfVideo: String):Call {
+    fun getSearchWithParametersMovieCall(
+        title: String,
+        yearOfProduction: String,
+        typeOfVideo: String
+    ): Call {
 
         val url = HttpUrl.Builder()
             .scheme("http")
@@ -48,7 +50,7 @@ object Network {
             .addQueryParameter("type", typeOfVideo)
             .build()
 
-        Log.d("Network getSearchWithParams", "Network: $url")
+        //Log.d("Network getSearchWithParams", "Network: $url")
 
         val request = Request.Builder()
             .get()
