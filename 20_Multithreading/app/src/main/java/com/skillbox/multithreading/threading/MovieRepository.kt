@@ -11,11 +11,11 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 
 class MovieRepository {
 
     val NUMBER_OF_CORES = Runtime.getRuntime().availableProcessors()
-    var executor = Executors.newFixedThreadPool(NUMBER_OF_CORES/*, BackgroundThreadFactory()*/)
 
     fun getMovieById(movieId: String): Movie? {
         return Network.api().getMovieById(movieId, MOVIE_API_KEY).execute()
@@ -27,56 +27,43 @@ class MovieRepository {
         movieIDsForMainThread: List<String>,
         onMoviesFetched: (movies: List<Movie>, fetchTime: Long) -> Unit
     ) {
-        Log.d("ThreadTest", "fetchMovies start on ${Thread.currentThread().name}")
-        val mainHandler = Handler(Looper.getMainLooper())
+        Log.d("ThreadTest", "BEFORE fetch on ${Thread.currentThread().name}")
+        Thread {
+            Log.d("ThreadTest", "fetchMovies start on ${Thread.currentThread().name}")
+            val mainHandler = Handler(Looper.getMainLooper())
 
-        val future = executor.submit<List<Any>>() {
-            val requestTime: Long
-            val startTime = System.currentTimeMillis()
-            var allMovies = Collections.synchronizedList(mutableListOf<Movie>())
-            Log.d("ThreadTest", "EXECUTOR fetchMovies continues on ${Thread.currentThread().name}")
+            val executor = Executors.newFixedThreadPool(NUMBER_OF_CORES)
+            val allMovies = Collections.synchronizedList(mutableListOf<Movie>())
 
-            val callable1 = Callable<MutableList<Movie>> {
+            val start = System.currentTimeMillis()
+            val sizeOfChunk = movieIds.count() / NUMBER_OF_CORES
+            Log.d("ThreadTest", "Size of chunks=$sizeOfChunk Count of cores=$NUMBER_OF_CORES")
+            movieIds.chunked(sizeOfChunk).forEach {
+                executor.submit {
+                    allMovies.addAll(it.mapNotNull { movieId ->
+                        Log.d(
+                            "ThreadTest",
+                            "executing on multiple threads ${Thread.currentThread().name}"
+                        )
+                        getMovieById(movieId)
+                    })
+                }
+            }
+            executor.shutdown()
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)
+            val requestTime = System.currentTimeMillis() - start
+
+            mainHandler.post {
                 Log.d(
                     "ThreadTest",
-                    "Callable start fetchMovies continues on ${Thread.currentThread().name}"
+                    "after EXECUTOR fetchMovies continues on ${Thread.currentThread().name}"
                 )
-
-                allMovies = movieIds.chunked(NUMBER_OF_CORES).map { movieChunk ->
-                    val movies = movieChunk.mapNotNull { movieId ->
-                        getMovieById(movieId)
-                    }
-                    Log.d("ThreadTest", "Callable fetching movies ${Thread.currentThread().name}")
-                    movies
-                }.flatten()
-
-                //requestTime = System.currentTimeMillis() - startTime
-                allMovies
+                val moviesFromMainThread =
+                    movieIDsForMainThread.mapNotNull { movieId -> getMovieById(movieId) }
+                allMovies.addAll(0, moviesFromMainThread)
+                onMoviesFetched(allMovies, requestTime)
             }
-            val c1 = createCallable(callable1)
-            Log.d("ThreadTest", "callable1 =  on ${Thread.currentThread().name}")
-
-            requestTime = System.currentTimeMillis() - startTime
-            return@submit listOf<Any>(c1.call(), requestTime)
-        }
-
-        mainHandler.post {
-            Log.d(
-                "ThreadTest",
-                "after EXECUTOR fetchMovies continues on ${Thread.currentThread().name}"
-            )
-            val moviesFromMainThread =
-                movieIDsForMainThread.mapNotNull { movieId ->
-                    getMovieById(movieId)
-                }
-            val result = future.get()
-            val allMovies: MutableList<Movie> = result[0] as MutableList<Movie>
-            val requestTime: Long = result[1] as Long
-            allMovies.addAll(0, moviesFromMainThread)
-            onMoviesFetched(allMovies, requestTime)
-        }
-
-        Log.d("ThreadTest", "fetchMovies end on ${Thread.currentThread().name}")
+        }.start()
     }
 
     private fun <T> createCallable(task: Callable<T>): Callable<T> {
@@ -94,11 +81,11 @@ class MovieRepository {
         println("got exception")
     }
 
-    //val future2 = executor.submit<Int>(ReturnSomething())
+/*    val future2 = executor.submit(ReturnSomething())
 
-    fun ReturnSomething(): Int {
-        return 42
-    }
+    fun ReturnSomething(): Runnable {
+        return Runnable { 42 }
+    }*/
 
     /** A ThreadFactory implementation which create new threads for the thread pool.
     The threads created is set to background priority, so it does not compete with the UI thread. **/
@@ -123,34 +110,3 @@ class MovieRepository {
         }
     }
 }
-
-////старое решение на потоках
-/*        Thread {
-            val startTime = System.currentTimeMillis()
-            val allMovies = Collections.synchronizedList(mutableListOf<Movie>())
-            Log.d("ThreadTest", "fetchMovies continues on ${Thread.currentThread().name}")
-            val threads = movieIds.chunked(1).map { movieChunk ->
-                Thread {
-                    val movies = movieChunk.mapNotNull { movieId ->
-                        getMovieById(movieId)
-                    }
-                    allMovies.addAll(movies)
-                }
-            }
-
-            threads.forEach { it.start() }
-            threads.forEach { it.join() }
-
-            val requestTime = System.currentTimeMillis() - startTime
-
-            mainHandler.post {
-                Log.d("ThreadTest", "fetchMovies continues on ${Thread.currentThread().name}")
-                val moviesFromMainThread =
-                    movieIDsForMainThread.mapNotNull { //movieId -> getMovieById(movieId)
-                           movieId -> Network.api().getMovieById(movieId, "43541a05").execute().body() }
-                allMovies.addAll(0, moviesFromMainThread)
-                //allMovies = moviesFromMainThread + allMovies
-                onMoviesFetched(allMovies, requestTime)
-            }
-
-        }.start()*/
